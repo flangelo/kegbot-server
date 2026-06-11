@@ -1,9 +1,5 @@
-import urllib.parse
-
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
-
-from pykeg.web.util import get_base_url
 
 try:
     from storages.backends.s3boto import S3BotoStorage
@@ -14,18 +10,16 @@ S3_STATIC_BUCKET = getattr(settings, "S3_STATIC_BUCKET", None)
 
 
 class KegbotFileSystemStorage(FileSystemStorage):
-    """Default storage backend that crafts absolute urls from KegbotSite.base_url.
+    """Default storage backend for Kegbot media files.
 
-    Since the storage backed is not a singleton within django request
-    processing (and thus there's not a single object we can pre-configure
-    with the base URL), this custom backend seems necessary.
+    Uses MEDIA_URL directly so generated URLs are host-relative (e.g.
+    /media/pics/foo.jpg).  The old approach of prepending an absolute
+    base URL via get_base_url() mutated shared instance state on the
+    first request, permanently locking in whatever hostname hit first
+    (typically localhost from the kiosk) for all subsequent requests.
+    Absolute URLs for notifications are constructed explicitly by
+    KegbotSite.base_url(), not here.
     """
-
-    def url(self, name):
-        base_url = get_base_url()
-        if not self.base_url.startswith(base_url):
-            self.base_url = urllib.parse.urljoin(base_url, self.base_url)
-        return super(KegbotFileSystemStorage, self).url(name)
 
 
 if S3BotoStorage:
