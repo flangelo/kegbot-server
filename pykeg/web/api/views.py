@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from pykeg.core import keg_sizes, models
+from pykeg.core import keg_sizes, models, signals
 from pykeg.core import util as core_util
 from pykeg.proto import kbapi, protolib
 from pykeg.web.api import devicelink, forms, util
@@ -675,6 +675,42 @@ def _tap_detail_post(request, tap):
     duration = cd.get("duration")
     if duration is None:
         duration = 0
+
+    # Emit real-time pour update for WebSocket clients
+    meter = tap.current_meter()
+    meter_name = meter.meter_name() if meter else None
+    keg = tap.current_keg
+    beer_name = None
+    beer_image_url = None
+    if keg and keg.type:
+        beer_name = keg.type.name
+        if keg.type.picture:
+            try:
+                beer_image_url = keg.type.picture.resized.url
+            except Exception:
+                pass
+        if not beer_image_url:
+            try:
+                beer_image_url = keg.get_illustration_thumb()
+            except Exception:
+                pass
+    ticks = cd["ticks"]
+    volume_ml = cd.get("volume_ml") or 0
+    if not volume_ml and meter and meter.ticks_per_ml:
+        volume_ml = ticks / meter.ticks_per_ml
+
+    signals.pour_in_progress.send(
+        sender=tap,
+        meter_name=meter_name,
+        tap_name=tap.name,
+        beer_name=beer_name,
+        beer_image_url=beer_image_url,
+        ticks=ticks,
+        volume_ml=volume_ml,
+        duration=duration,
+        user=cd.get("username"),
+        timestamp=timezone.now(),
+    )
 
     drink = models.Drink.record_drink(
         tap,

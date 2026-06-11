@@ -10,7 +10,7 @@ services:
   kegbot:
     image: kegbot-server
     restart: unless-stopped
-    command: run_server
+    entrypoint: /docker-entrypoint.sh
     build: .
     ports:
       - "8000:8000"
@@ -23,6 +23,20 @@ services:
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: mysql://kegbot_dev:changeme@mysql/kegbot_dev
       KEGBOT_ENV: "debug"
+      KEGBOT_SECRET_KEY: "changeme"
+
+  kegnet-listener:
+    image: kegbot-server
+    restart: unless-stopped
+    command: run_kegnet_listener
+    volumes:
+      - kegbot-data:/kegbot-data
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: mysql://kegbot_dev:changeme@mysql/kegbot_dev
       KEGBOT_SECRET_KEY: "changeme"
 
   workers:

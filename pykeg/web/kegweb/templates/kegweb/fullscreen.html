@@ -47,6 +47,70 @@ img.taplist-foot-logos {
 	max-height:100%;
 }
 
+/* Pour panel — fixed overlay, stacks cards vertically, first-started on top */
+#pour-panel {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 100;
+	display: none;   /* switched to flex by JS when active */
+	flex-direction: column;
+	gap: 12px;
+	width: 560px;
+	max-width: 92vw;
+}
+
+.pour-card {
+	display: flex;
+	align-items: center;
+	background: rgba(0, 0, 0, 0.88);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 12px;
+	padding: 18px 24px;
+	color: white;
+	font-family: Arial, sans-serif;
+}
+
+.pour-card-image {
+	max-height: 100px;
+	max-width: 80px;
+	object-fit: contain;
+	border-radius: 6px;
+	margin-right: 20px;
+	flex-shrink: 0;
+}
+
+.pour-card-info {
+	flex: 1;
+}
+
+.pour-tap-name {
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	opacity: 0.6;
+	margin-bottom: 2px;
+}
+
+.pour-beer-name {
+	font-size: 20px;
+	font-weight: bold;
+	margin-bottom: 6px;
+}
+
+.pour-title {
+	font-size: 14px;
+	opacity: 0.7;
+	margin-bottom: 4px;
+}
+
+.pour-amount {
+	font-size: 48px;
+	font-weight: bold;
+	color: #ffeb3b;
+	line-height: 1;
+}
 
 </style>
 {% endblock %}
@@ -74,6 +138,7 @@ img.taplist-foot-logos {
             {% with tap.current_keg as keg %}
             {% with keg.type as beverage %}
 
+            <div class="tap-display" data-tap="{{ tap.meter }}" data-meter-name="{{ tap.meter }}">
             <div class="row-fluid">
 
             <div class="span2">
@@ -102,6 +167,7 @@ img.taplist-foot-logos {
               {% endif %}
             </div>
             </div>
+            </div>
 
             {% endwith %}
             {% endwith %}
@@ -117,16 +183,19 @@ img.taplist-foot-logos {
 </div> <!-- /wrapper -->
 </div> <!-- /main -->
 
+<div id="pour-panel"></div>
+
 {% endblock %}
 
 {% block kb-extrajs %}
 <script type="text/javascript" src={% static "lib/slick/slick.min.js" %}></script>
+<script type="text/javascript" src={% static "js/fullscreen-realtime.js" %}></script>
 
 <script type="text/javascript">
 
-  // Activate carousel.
+  // Activate carousel and store reference for pause/resume
   $(document).ready(function(){
-      $('.tap-carousel').slick({
+      var carousel = $('.tap-carousel').slick({
           autoplay: true,
           autoplaySpeed: 10000,
           arrows: false,
@@ -134,9 +203,10 @@ img.taplist-foot-logos {
           infinite: true,
           pauseOnHover: false,
       });
+      window.slickCarousel = carousel;
   });
 
-  // Auto-reload when something happens.
+  // Auto-reload when something happens (fallback for when WebSocket unavailable).
   var lastEvent = null;
   var queryInterval = 10000;
 
@@ -149,7 +219,10 @@ img.taplist-foot-logos {
           var prevLast = lastEvent;
           lastEvent = latest;
           if (prevLast != null) {
-            location.reload(true);
+            // Only do full reload if WebSocket not connected
+            if (!window.wsConnection || window.wsConnection.readyState !== WebSocket.OPEN) {
+              location.reload(true);
+            }
           }
         }
       } else {

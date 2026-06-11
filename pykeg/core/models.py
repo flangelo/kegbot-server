@@ -1685,6 +1685,36 @@ def _auth_token_pre_save(sender, instance, **kwargs):
 pre_save.connect(_auth_token_pre_save, sender=AuthenticationToken)
 
 
+class PourInProgress(models.Model):
+    """Tracks in-progress pours for real-time UI updates via WebSocket."""
+
+    keg_tap = models.ForeignKey(KegTap, on_delete=models.CASCADE, help_text="The tap being poured from.")
+    meter = models.ForeignKey(
+        FlowMeter, on_delete=models.CASCADE, help_text="The flow meter recording the pour."
+    )
+    user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, help_text="User pouring the drink."
+    )
+    start_time = models.DateTimeField(auto_now_add=True, help_text="When the pour started.")
+    ticks = models.IntegerField(default=0, help_text="Current flow meter ticks.")
+    volume_ml = models.FloatField(default=0, help_text="Current volume in milliliters.")
+    last_updated = models.DateTimeField(auto_now=True, help_text="Last update timestamp.")
+
+    class Meta(object):
+        verbose_name = "Pour In Progress"
+        verbose_name_plural = "Pours In Progress"
+
+    def __str__(self):
+        return f"Pour: {self.keg_tap} ({self.volume_ml}ml)"
+
+    @property
+    def is_active(self):
+        """Consider pour inactive if no updates in 5+ seconds."""
+        if not self.last_updated:
+            return False
+        return (timezone.now() - self.last_updated).total_seconds() < 5
+
+
 class DrinkingSession(models.Model):
     """A collection of contiguous drinks."""
 

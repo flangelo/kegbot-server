@@ -27,3 +27,6 @@ keg_ended = Signal()
 keg_deleted = Signal()
 
 events_created = Signal()
+
+pour_in_progress = Signal()
+

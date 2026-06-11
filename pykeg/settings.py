@@ -31,6 +31,7 @@ DATABASES = {
 }
 
 INSTALLED_APPS = (
+    "daphne",
     "whitenoise.runserver_nostatic",
     "pykeg.core",
     "pykeg.web",
@@ -40,6 +41,7 @@ INSTALLED_APPS = (
     "pykeg.web.kegadmin",
     "pykeg.web.kegweb",
     "pykeg.web.setup_wizard",
+    "channels",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -158,8 +160,26 @@ CACHES = {
         "LOCATION": KEGBOT["REDIS_URL"],
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # redis-py 8.0 introduced DEFAULT_SOCKET_TIMEOUT=5s which causes
+            # rq's blocking BRPOP to time out and the worker to exit cleanly.
+            "SOCKET_TIMEOUT": None,
+            "SOCKET_CONNECT_TIMEOUT": None,
         },
         "KEY_PREFIX": "kb:rq",
+    },
+}
+
+ASGI_APPLICATION = "pykeg.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            # redis-py 8.0 introduced DEFAULT_SOCKET_TIMEOUT=5s, which races
+            # channels_redis's 5s BRPOP timeout and raises TimeoutError instead
+            # of returning None. Explicitly set None to restore old behaviour.
+            "hosts": [{"address": KEGBOT["REDIS_URL"], "socket_timeout": None}],
+        },
     },
 }
 
