@@ -11,17 +11,6 @@ import os
 import dj_database_url
 import dj_email_url
 
-# redis-py 8.0 introduced DEFAULT_SOCKET_TIMEOUT=5s.  django-redis/pool.py
-# checks `if socket_timeout:` before passing it to the pool, so setting
-# SOCKET_TIMEOUT: None in CACHES OPTIONS is silently dropped (None is falsy).
-# Patching the default here ensures every un-configured connection uses no
-# timeout, which lets rq's BLPOP block until Redis responds.
-try:
-    import redis._defaults as _redis_defaults
-    _redis_defaults.DEFAULT_SOCKET_TIMEOUT = None
-except Exception:
-    pass
-
 from pykeg import config
 from pykeg.config import ENV_PRODUCTION, ENV_TEST
 from pykeg.logging.logger import RedisLogger
