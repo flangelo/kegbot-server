@@ -684,16 +684,11 @@ def _tap_detail_post(request, tap):
     beer_image_url = None
     if keg and keg.type:
         beer_name = keg.type.name
-        if keg.type.picture:
-            try:
-                beer_image_url = keg.type.picture.resized.url
-            except Exception:
-                pass
-        if not beer_image_url:
-            try:
-                beer_image_url = keg.get_illustration_thumb()
-            except Exception:
-                pass
+        pic = keg.type.picture
+        if pic and pic.image:
+            from django.conf import settings as django_settings
+            media_url = getattr(django_settings, "MEDIA_URL", "/media/")
+            beer_image_url = media_url.rstrip("/") + "/" + pic.image.name
     ticks = cd["ticks"]
     volume_ml = cd.get("volume_ml") or 0
     if not volume_ml and meter and meter.ticks_per_ml:
