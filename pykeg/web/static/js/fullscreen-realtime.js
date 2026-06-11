@@ -11,9 +11,10 @@ const FULLSCREEN_REALTIME_CONFIG = {
     mlToOz: 29.5735,
 };
 
-var currentPours = {};  // tapName → latest pourData
-var pourOrder = [];     // tapNames in start order; index 0 = first-started = top of stack
-var updateTimers = {};  // tapName → timeout id
+var currentPours = {};   // tapName → latest pourData
+var pourOrder = [];      // tapNames in start order; index 0 = first-started = top of stack
+var pourBaselines = {};  // tapName → volume_ml at pour start (cumulative meter offset)
+var updateTimers = {};   // tapName → timeout id
 var wsConnection = null;
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
@@ -55,9 +56,10 @@ function connectWebSocket() {
 function handlePourUpdate(pourData) {
     var tapName = pourData.tap;
 
-    // New pour: record its position in the start order
+    // New pour: record its position in the start order and the baseline volume
     if (pourOrder.indexOf(tapName) === -1) {
         pourOrder.push(tapName);
+        pourBaselines[tapName] = pourData.volume_ml;
     }
 
     currentPours[tapName] = pourData;
@@ -88,6 +90,7 @@ function removePour(tapName) {
         pourOrder.splice(idx, 1);
     }
     delete currentPours[tapName];
+    delete pourBaselines[tapName];
     renderPourPanel();
 }
 
@@ -118,7 +121,8 @@ function renderPourPanel() {
 }
 
 function buildPourCard(pourData) {
-    var volumeOz = (pourData.volume_ml / FULLSCREEN_REALTIME_CONFIG.mlToOz).toFixed(1);
+    var baseline = pourBaselines[pourData.tap] || 0;
+    var volumeOz = ((pourData.volume_ml - baseline) / FULLSCREEN_REALTIME_CONFIG.mlToOz).toFixed(1);
 
     var card = document.createElement('div');
     card.className = 'pour-card';
