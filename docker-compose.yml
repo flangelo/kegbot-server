@@ -42,7 +42,7 @@ services:
   workers:
     image: kegbot-server
     restart: unless-stopped
-    command: run_workers
+    command: rqworker default stats
     volumes:
       - kegbot-data:/kegbot-data
     tmpfs:
