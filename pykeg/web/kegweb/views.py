@@ -109,6 +109,16 @@ def fullscreen(request):
     return render(request, "kegweb/fullscreen.html", context=context)
 
 
+def fullscreen_realtime(request):
+    context = {}
+    taps = models.KegTap.objects.all()
+    active_taps = [t for t in taps if t.current_keg]
+    pages = [active_taps[i : i + 4] for i in range(0, len(active_taps), 4)]
+    context["pages"] = pages
+
+    return render(request, "kegweb/fullscreen_realtime.html", context=context)
+
+
 @cache_page(30)
 def keg_detail(request, keg_id):
     keg = get_object_or_404(models.Keg, id=keg_id)

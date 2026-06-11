@@ -1,0 +1,135 @@
+{% extends "kegweb/fullscreen.html" %}
+{% load static kegweblib %}
+
+{% block title %}{{ kbsite.title }} (Fullscreen Realtime){% endblock %}
+
+{% block kb-extracss %}
+{{ block.super }}
+<style>
+
+/* Pour panel — fixed overlay, stacks cards vertically, first-started on top */
+#pour-panel {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 100;
+	display: none;   /* switched to flex by JS when active */
+	flex-direction: column;
+	gap: 12px;
+	width: 560px;
+	max-width: 92vw;
+}
+
+.pour-card {
+	display: flex;
+	align-items: center;
+	background: rgba(0, 0, 0, 0.88);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 12px;
+	padding: 18px 24px;
+	color: white;
+	font-family: Arial, sans-serif;
+}
+
+.pour-card-image {
+	max-height: 100px;
+	max-width: 80px;
+	object-fit: contain;
+	border-radius: 6px;
+	margin-right: 20px;
+	flex-shrink: 0;
+}
+
+.pour-card-info {
+	flex: 1;
+}
+
+.pour-tap-name {
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	opacity: 0.6;
+	margin-bottom: 2px;
+}
+
+.pour-beer-name {
+	font-size: 20px;
+	font-weight: bold;
+	margin-bottom: 6px;
+}
+
+.pour-title {
+	font-size: 14px;
+	opacity: 0.7;
+	margin-bottom: 4px;
+}
+
+.pour-amount {
+	font-size: 48px;
+	font-weight: bold;
+	color: #ffeb3b;
+	line-height: 1;
+}
+
+</style>
+{% endblock %}
+
+{% block carousel_script %}
+<script type="text/javascript">
+
+  // Activate carousel and store reference so the pour overlay can pause/resume it.
+  $(document).ready(function(){
+      var carousel = $('.tap-carousel').slick({
+          autoplay: true,
+          autoplaySpeed: 10000,
+          arrows: false,
+          dots: true,
+          infinite: true,
+          pauseOnHover: false,
+      });
+      window.slickCarousel = carousel;
+  });
+
+</script>
+{% endblock carousel_script %}
+
+{% block pour_panel %}
+<div id="pour-panel"></div>
+{% endblock %}
+
+{% block polling_script %}
+<script type="text/javascript" src={% static "js/fullscreen-realtime.js" %}></script>
+<script type="text/javascript">
+
+  // Auto-reload on new events, but skip if the WebSocket is live (it handles updates).
+  var lastEvent = null;
+  var queryInterval = 10000;
+
+  function fetchEvents() {
+    $.getJSON('/api/v1/events/', function(events) {
+      if (events && events.objects && events.objects.length > 0) {
+        var latest = events.objects[0];
+        if (lastEvent == null || lastEvent.id != latest.id) {
+          console.log('Events updated, latest=' + latest.id);
+          var prevLast = lastEvent;
+          lastEvent = latest;
+          if (prevLast != null) {
+            if (!window.wsConnection || window.wsConnection.readyState !== WebSocket.OPEN) {
+              location.reload(true);
+            }
+          }
+        }
+      } else {
+        console.log('No events.');
+      }
+    });
+    setTimeout(fetchEvents, queryInterval);
+  }
+
+  $(document).ready(function(){
+    fetchEvents();
+  });
+
+</script>
+{% endblock polling_script %}

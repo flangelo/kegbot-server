@@ -13,6 +13,7 @@ urlpatterns = [
     path("kegs/<int:keg_id>/sessions/", views.keg_sessions, name="kb-keg-sessions"),
     # fullscreen mode
     path("fullscreen/", views.fullscreen, name="kb-fullscreen"),
+    path("fullscreen-realtime/", views.fullscreen_realtime, name="kb-fullscreen-realtime"),
     # drinkers
     path("drinkers/<str:username>/", views.user_detail, name="kb-drinker"),
     path(
