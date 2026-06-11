@@ -22,14 +22,7 @@ RUN apt-get update \
        libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pip, Rust (for cryptography), and poetry.
-# Rust install and removal are in one RUN so no Rust layer persists in the image.
-RUN python -m pip install -U pip \
-    && curl https://sh.rustup.rs -sSf | sh -s -- -y \
-    && PATH=/root/.cargo/bin:$PATH pip install cryptography \
-    && rm -rf /root/.rustup /root/.cargo \
-    && pip install poetry \
-    && rm -rf /root/.cache
+RUN python -m pip install -U pip && pip install poetry && rm -rf /root/.cache
 
 # Resolve and install production-only Python dependencies (no pytest, sphinx, etc.).
 COPY pyproject.toml poetry.lock ./
