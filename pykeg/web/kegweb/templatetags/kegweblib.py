@@ -183,7 +183,7 @@ class TemperatureNode(Node):
             unit = "F"
             amount = CtoF(amount)
 
-        return self.TEMPLATE % {"amount": amount, "unit": unit}
+        return self.TEMPLATE % {"amount": round(amount, 1), "unit": unit}
 
 
 # volume

@@ -100,6 +100,13 @@ img.taplist-foot-logos {
                   <em>{{ beverage.description }}</em>
                 </p>
               {% endif %}
+              {% if tap.temperature_sensor %}
+              {% with tap.temperature_sensor.LastLog as temp %}
+              {% if temp %}
+                <p><small>Keg temperature: {% temperature temp.temp %}</small></p>
+              {% endif %}
+              {% endwith %}
+              {% endif %}
             </div>
             </div>
             {% endwith %}
