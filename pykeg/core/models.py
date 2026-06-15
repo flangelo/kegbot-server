@@ -1051,7 +1051,7 @@ class Keg(models.Model):
         pct = self.percent_full()
         if pct >= 98.0:
             level = 5
-        elif pct >= 90.0:
+        elif pct >= 75.0:
             level = 4
         elif pct >= 45.0:
             level = 3
