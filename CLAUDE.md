@@ -43,7 +43,7 @@ ssh kegberry "docker logs kegberry-workers-1 --tail 50"
 | `kegberry-pycore-1` | `kegbot/pycore:latest` | pycore event processor |
 | `kegberry-nginx-1` | `nginx:alpine` | reverse proxy (port 8000) |
 | `kegberry-redis-1` | `redis:7.2` | message bus + task queue |
-| `kegberry-mysql-1` | `mariadb:10.11` | database |
+| `kegberry-mysql-1` | built from `kegberry/db/` (mariadb:10.11 + tzdata) | database |
 
 ## Key environment variables
 | Variable | Required | Default | Purpose |
@@ -99,6 +99,7 @@ Tests use `pytest-django`. The `[tool:pytest]` config in `setup.cfg` sets `DJANG
 - **Multi-stage Dockerfile** — Stage 1 (`python:3.10-bullseye`) compiles Python extensions; Stage 2 (`python:3.10-slim-bullseye`) is the runtime image. This avoids OOM build crashes on the Pi and keeps the image slim. Do not collapse back to a single stage.
 - **`KEGBOT_MEDIA_URL` for media behind a proxy** — without this set, Django's `request.build_absolute_uri` can lock `MEDIA_URL` to the first request's hostname. Set `KEGBOT_MEDIA_URL` to a host-relative path (e.g. `/media/`) or absolute URL in production to avoid broken image links.
 - **Django 3.2 / Python 3.10** — upstream is pinned here. Do not upgrade Django to 4.x without auditing all custom middleware and signals; `future` package compatibility is also a constraint.
+- **MariaDB timezone tables must be populated** — Django uses `CONVERT_TZ()` internally for date queries; if the `mysql.time_zone` tables are empty you get `ValueError: Database returned an invalid datetime value` on pages like `/sessions/`. The `mysql` service is built from `kegberry/db/` (not pulled directly from `mariadb:10.11`) to run `mysql_tzinfo_to_sql` on first init. If you're upgrading an existing volume, run it manually: `docker exec kegberry-mysql-1 bash -c "mysql_tzinfo_to_sql /usr/share/zoneinfo | mysql -u root mysql"`.
 
 ## Useful debugging
 ```bash
