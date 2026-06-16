@@ -1,6 +1,16 @@
+import logging
+import time
+
 from django.dispatch import receiver
 
 from . import signals, tasks
+
+logger = logging.getLogger(__name__)
+
+# Throttle temperature-driven tap_state pushes to at most once per 5 minutes
+# (temperature is logged every ~60s per sensor; volume is the time-sensitive field).
+_TEMP_TAP_STATE_INTERVAL = 30  # seconds
+_last_temp_tap_state_push = 0.0
 
 
 @receiver(signals.drink_recorded)
@@ -8,6 +18,23 @@ def on_drink_recorded(sender, **kwargs):
     """Build stats when a drink is created."""
     drink = kwargs["drink"]
     tasks.build_stats.delay(drink_id=drink.id, rebuild_following=False)
+
+
+@receiver(signals.drink_recorded)
+def on_drink_recorded_push_tap_state(sender, **kwargs):
+    """Push updated tap state (keg volume) to WebSocket clients after a pour."""
+    _push_tap_state()
+
+
+@receiver(signals.temperature_recorded)
+def on_temperature_recorded_push_tap_state(sender, **kwargs):
+    """Push updated tap state (temperature) to WebSocket clients, throttled."""
+    global _last_temp_tap_state_push
+    now = time.monotonic()
+    if now - _last_temp_tap_state_push < _TEMP_TAP_STATE_INTERVAL:
+        return
+    _last_temp_tap_state_push = now
+    _push_tap_state()
 
 
 @receiver(signals.drink_assigned)
@@ -36,7 +63,7 @@ def on_events_created(sender, **kwargs):
 
 @receiver(signals.pour_in_progress)
 def on_pour_in_progress(sender, **kwargs):
-    """Broadcast pour updates to WebSocket clients."""
+    """Broadcast pour_ended event to WebSocket clients."""
     try:
         from asgiref.sync import async_to_sync
         from channels.layers import get_channel_layer
@@ -58,10 +85,22 @@ def on_pour_in_progress(sender, **kwargs):
                 "ticks": kwargs.get("ticks", 0),
             },
         )
-    except Exception as e:
-        # Log error but don't break the drink recording if WebSocket fails
-        import logging
+    except Exception as exc:
+        logger.warning("Failed to broadcast pour_ended event: %s", exc)
 
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Failed to broadcast pour event: {e}")
 
+def _push_tap_state():
+    """Push current tap state (volume, temperature, illustration) to WebSocket clients."""
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from pykeg.web.consumers import build_tap_state_payload
+
+        taps = build_tap_state_payload()
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "fullscreen_pours",
+            {"type": "tap_state_event", "taps": taps},
+        )
+    except Exception as exc:
+        logger.warning("Failed to broadcast tap_state: %s", exc)

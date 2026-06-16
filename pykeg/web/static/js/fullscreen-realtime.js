@@ -33,6 +33,8 @@ function connectWebSocket() {
                 handlePourUpdate(data);
             } else if (data.event_type === 'pour_ended') {
                 handlePourEnded(data);
+            } else if (data.event_type === 'tap_state') {
+                handleTapState(data);
             }
         };
 
@@ -178,6 +180,33 @@ function resumeCarousel() {
     if (window.slickCarousel && typeof window.slickCarousel.slick === 'function') {
         try { window.slickCarousel.slick('slickPlay'); } catch (e) {}
     }
+}
+
+// ── Tap state updates ──────────────────────────────────────────────────────
+
+function handleTapState(data) {
+    var taps = data.taps || [];
+    taps.forEach(function(tap) {
+        var id = tap.tap_id;
+
+        if (tap.volume_label) {
+            var volEl = $('[data-tap-volume="' + id + '"]');
+            if (volEl.length) {
+                volEl.text(tap.volume_label + ' remaining');
+            }
+        }
+
+        if (tap.temp_str) {
+            var tempEl = $('[data-tap-temp="' + id + '"]');
+            if (tempEl.length) {
+                tempEl.text('Keg temperature: ' + tap.temp_str);
+            }
+        }
+
+        if (tap.illustration_url) {
+            $('[data-tap-illustration="' + id + '"]').attr('src', tap.illustration_url);
+        }
+    });
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

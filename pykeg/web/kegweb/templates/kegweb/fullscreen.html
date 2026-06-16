@@ -77,7 +77,7 @@ img.taplist-foot-logos {
             <div class="row-fluid">
 
             <div class="span2">
-              <img src="{{ keg.get_illustration }}" style="padding-bottom: 20px;">
+              <img data-tap-illustration="{{ tap.id }}" src="{{ keg.get_illustration }}" style="padding-bottom: 20px;">
             </div>
 
             <div class="span2">
@@ -87,7 +87,7 @@ img.taplist-foot-logos {
               {% else %}
                 <img class="tap-snapshot-image" src={% static "images/kegbot-unknown-square.png" %}>
               {% endif %}
-                <span class="label label-info">{% volume keg.remaining_volume_ml %} remaining</span>
+                <span class="label label-info" data-tap-volume="{{ tap.id }}">{% volume keg.remaining_volume_ml %} remaining</span>
               </center>
             </div>
 
@@ -103,7 +103,7 @@ img.taplist-foot-logos {
               {% if tap.temperature_sensor %}
               {% with tap.temperature_sensor.LastLog as temp %}
               {% if temp %}
-                <p><small>Keg temperature: {% temperature temp.temp %}</small></p>
+                <p><small data-tap-temp="{{ tap.id }}">Keg temperature: {% temperature temp.temp %}</small></p>
               {% endif %}
               {% endwith %}
               {% endif %}

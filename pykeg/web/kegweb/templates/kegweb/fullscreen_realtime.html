@@ -102,7 +102,7 @@
 <script type="text/javascript" src={% static "js/fullscreen-realtime.js" %}></script>
 <script type="text/javascript">
 
-  // Auto-reload on new events, but skip if the WebSocket is live (it handles updates).
+  // Auto-reload on new events only when the WebSocket is down (it handles updates otherwise).
   var lastEvent = null;
   var queryInterval = 10000;
 
