@@ -7,6 +7,7 @@
 const FULLSCREEN_REALTIME_CONFIG = {
     wsUrl: (window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
         window.location.host + '/ws/fullscreen/',
+    settleTimeout: 500,    // ms of silence before a pour switches to "Poured"
     updateTimeout: 10000,  // ms of silence before a pour card is dropped
     mlToOz: 29.5735,
 };
@@ -14,7 +15,9 @@ const FULLSCREEN_REALTIME_CONFIG = {
 var currentPours = {};   // tapName → latest pourData
 var pourOrder = [];      // tapNames in start order; index 0 = first-started = top of stack
 var pourBaselines = {};  // tapName → volume_ml at pour start (cumulative meter offset)
-var updateTimers = {};   // tapName → timeout id
+var pourSettled = {};    // tapName → true once flow has stopped (shows "Poured")
+var settleTimers = {};   // tapName → timeout id (Pouring → Poured)
+var updateTimers = {};   // tapName → timeout id (card removal)
 var wsConnection = null;
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
@@ -66,7 +69,19 @@ function handlePourUpdate(pourData) {
 
     currentPours[tapName] = pourData;
 
-    // Reset the idle timeout for this tap
+    // An active flow event: this pour is "Pouring" again.
+    pourSettled[tapName] = false;
+
+    // After settleTimeout of silence, switch the card to "Poured".
+    if (settleTimers[tapName]) {
+        clearTimeout(settleTimers[tapName]);
+    }
+    settleTimers[tapName] = setTimeout(function() {
+        pourSettled[tapName] = true;
+        renderPourPanel();
+    }, FULLSCREEN_REALTIME_CONFIG.settleTimeout);
+
+    // After updateTimeout of silence, drop the card entirely.
     if (updateTimers[tapName]) {
         clearTimeout(updateTimers[tapName]);
     }
@@ -79,11 +94,14 @@ function handlePourUpdate(pourData) {
 
 function handlePourEnded(pourData) {
     var tapName = pourData.tap;
-    if (updateTimers[tapName]) {
-        clearTimeout(updateTimers[tapName]);
-        delete updateTimers[tapName];
+    // Flow has explicitly stopped: switch to "Poured" now, but leave the card
+    // up for the remainder of the idle timeout before removing it.
+    if (settleTimers[tapName]) {
+        clearTimeout(settleTimers[tapName]);
+        delete settleTimers[tapName];
     }
-    removePour(tapName);
+    pourSettled[tapName] = true;
+    renderPourPanel();
 }
 
 function removePour(tapName) {
@@ -91,8 +109,17 @@ function removePour(tapName) {
     if (idx !== -1) {
         pourOrder.splice(idx, 1);
     }
+    if (settleTimers[tapName]) {
+        clearTimeout(settleTimers[tapName]);
+        delete settleTimers[tapName];
+    }
+    if (updateTimers[tapName]) {
+        clearTimeout(updateTimers[tapName]);
+        delete updateTimers[tapName];
+    }
     delete currentPours[tapName];
     delete pourBaselines[tapName];
+    delete pourSettled[tapName];
     renderPourPanel();
 }
 
@@ -156,7 +183,7 @@ function buildPourCard(pourData) {
 
     var titleEl = document.createElement('div');
     titleEl.className = 'pour-title';
-    titleEl.textContent = 'Pouring…';
+    titleEl.textContent = pourSettled[pourData.tap] ? 'Poured' : 'Pouring…';
     info.appendChild(titleEl);
 
     var amountEl = document.createElement('div');
