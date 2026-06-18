@@ -5,15 +5,15 @@ from pykeg.core import models
 
 
 class Command(BaseCommand):
-    args = "<from> <to>"
     help = "Renames user from <from> to <to>."
 
-    def handle(self, *args, **options):
-        if len(args) < 2:
-            raise CommandError("Must specify <from> and <to>")
+    def add_arguments(self, parser):
+        parser.add_argument("from_username", help="Existing username to rename.")
+        parser.add_argument("to_username", help="New username.")
 
-        from_username = args[0]
-        to_username = args[1]
+    def handle(self, *args, **options):
+        from_username = options["from_username"]
+        to_username = options["to_username"]
 
         if from_username == "guest":
             raise CommandError("Cannot rename the guest user.")

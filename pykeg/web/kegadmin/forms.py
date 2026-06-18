@@ -466,6 +466,7 @@ class BeverageProducerForm(forms.ModelForm):
             "name",
             "country",
             "origin_state",
+            "origin_city",
             "is_homebrew",
             "url",
             "description",
