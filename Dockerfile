@@ -29,6 +29,40 @@ COPY pyproject.toml poetry.lock ./
 ADD pykeg/__init__.py ./pykeg/
 RUN poetry config virtualenvs.create false && poetry lock && poetry install --without dev -n
 
+# ── Stage: test ───────────────────────────────────────────────────────────────
+# Layers the dev dependencies (pytest, pytest-cov, etc.) on top of the builder so
+# the suite runs against the same compiled extensions as production. This stage is
+# never part of the runtime image — `docker build` defaults to the final stage, and
+# docker-compose.test.yml builds it explicitly with `target: test`.
+FROM builder AS test
+
+# Install only the test tooling on top of the prod deps already present from the
+# builder. We deliberately do NOT re-run `poetry install`: the builder's
+# `poetry install` pinned `packaging` to the app's version, which is too old for
+# poetry 2.x to run again ("No module named 'packaging.metadata'"). pip-installing
+# the handful of test packages directly is both simpler and faster, and skips the
+# docs/lint tooling (sphinx, black, flake8) that the suite doesn't need.
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-django \
+    pytest-cov \
+    pytest-asyncio \
+    requests-mock \
+    vcrpy
+
+# Application source and test data. Deps are already installed above so changes
+# here don't bust the dependency layer cache.
+ADD pykeg ./pykeg
+ADD testdata ./testdata
+COPY setup.cfg ./
+
+ENV KEGBOT_ENV=test \
+    KEGBOT_SECRET_KEY=test-secret-key \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Default to the full suite with coverage; override the command to scope it down.
+CMD ["pytest", "--cov=pykeg", "--cov-report=term-missing"]
+
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM python:3.10-slim-bullseye AS runtime
 

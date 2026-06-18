@@ -10,6 +10,12 @@
 ### local installs
 kegbot-data/
 staticfiles/
+node_modules/
+
+### test/coverage artifacts
+.pytest_cache/
+htmlcov/
+coverage.xml
 
 ### docs
 docs/build

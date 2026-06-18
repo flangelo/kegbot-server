@@ -1,0 +1,42 @@
+name: Tests
+
+# Containerized test suite: Python (Django/pytest) via the docker-compose test
+# stack, plus the frontend JS unit tests. Supersedes pybuild.yml's host-poetry
+# approach by running everything in the same images used locally.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  python:
+    name: Python suite (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run the test stack
+        run: |
+          docker compose -f docker-compose.test.yml up \
+            --build --abort-on-container-exit --exit-code-from test
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.test.yml down -v
+
+  javascript:
+    name: Frontend JS (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm test

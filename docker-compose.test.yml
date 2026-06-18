@@ -1,0 +1,56 @@
+# Self-contained test stack: MariaDB (with tz tables) + Redis + the app's test
+# image. Run the full suite with:
+#
+#   docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+#
+# Or a single file/test:
+#
+#   docker compose -f docker-compose.test.yml run --rm --build test pytest pykeg/core/models_test.py
+#
+# Tear down (volumes included) when done:
+#
+#   docker compose -f docker-compose.test.yml down -v
+
+services:
+  db:
+    build: ./testing/db
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
+      MARIADB_DATABASE: kegbot_test
+    tmpfs:
+      # Keep the test DB on a RAM disk — faster and disposable.
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.2
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  test:
+    build:
+      context: .
+      target: test
+    environment:
+      DATABASE_URL: mysql://root@db/kegbot_test
+      REDIS_URL: redis://redis:6379/0
+      KEGBOT_ENV: test
+      KEGBOT_SECRET_KEY: test-secret-key
+      # Tests assert absolute media URLs under the host that KEGBOT_BASE_URL
+      # defaults to under pytest (test.example.com). Without an absolute
+      # KEGBOT_MEDIA_URL, MEDIA_URL stays "/media/" and api_test.test_pictures
+      # fails. Mirrors the production guidance to set KEGBOT_MEDIA_URL behind a
+      # proxy (see CLAUDE.md).
+      KEGBOT_MEDIA_URL: http://test.example.com/media/
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
