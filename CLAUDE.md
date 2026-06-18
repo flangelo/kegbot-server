@@ -81,6 +81,10 @@ Flow: kegboard daemon → Redis `kegnet` pub/sub → `run_kegnet_listener` → D
 
 Throttled to one broadcast per 200 ms per tap (5/sec max). Meter names from the kegboard (e.g. `kegboard.flow0`) are resolved to tap/beer info by port suffix matching in the DB.
 
+The overlay card (in `static/js/fullscreen-realtime.js`) shows "Pouring… / xx oz" during active flow, switches to "Poured / xx oz" after 0.5 s of silence (or on a `pour_ended` event), then hides after a 10 s idle timeout. These thresholds are `settleTimeout` / `updateTimeout` in `FULLSCREEN_REALTIME_CONFIG`.
+
+**Forcing a display reload:** `kegbot reload_fullscreen` broadcasts a `reload` event over the `fullscreen_pours` group; every connected `/fullscreen-realtime/` page calls `location.reload(true)`. Use this after deploying static-asset changes — a display showing the old page keeps running the old JS until it reloads (otherwise it self-reloads only on its periodic timer or when the WebSocket is down). Only reaches pages with a live WebSocket. Run it on the Pi: `ssh kegberry "docker exec kegberry-kegbot-1 kegbot reload_fullscreen"`.
+
 The static `/fullscreen/` endpoint shows the tap list without live updates.
 
 ## Running tests
@@ -117,6 +121,9 @@ ssh kegberry "docker exec -it kegberry-kegbot-1 kegbot shell"
 
 # Run a management command on the Pi
 ssh kegberry "docker exec kegberry-kegbot-1 kegbot <command>"
+
+# Force all fullscreen displays to reload (e.g. after deploying JS/template changes)
+ssh kegberry "docker exec kegberry-kegbot-1 kegbot reload_fullscreen"
 
 # Rebuild without cache (if packages seem stale)
 ssh kegberry "cd ~/src/kegbot-server && docker build --no-cache -t ghcr.io/flangelo/kegbot-server:latest ."

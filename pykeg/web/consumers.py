@@ -144,3 +144,7 @@ class FullscreenConsumer(AsyncWebsocketConsumer):
                 {"event_type": "tap_state", "taps": event.get("taps", [])}
             )
         )
+
+    async def reload_event(self, event):
+        """Tell the client to reload the page (e.g. to pick up new static assets)."""
+        await self.send(text_data=json.dumps({"event_type": "reload"}))

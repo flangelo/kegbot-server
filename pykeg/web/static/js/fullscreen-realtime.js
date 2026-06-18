@@ -38,6 +38,8 @@ function connectWebSocket() {
                 handlePourEnded(data);
             } else if (data.event_type === 'tap_state') {
                 handleTapState(data);
+            } else if (data.event_type === 'reload') {
+                location.reload(true);
             }
         };
 
