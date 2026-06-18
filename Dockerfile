@@ -56,6 +56,11 @@ ADD pykeg ./pykeg
 ADD testdata ./testdata
 COPY setup.cfg ./
 
+# whitenoise inspects STATIC_ROOT on startup and warns once per test module if it
+# is missing. We don't collectstatic in the test image, so create an empty dir to
+# keep the warning out of the test output.
+RUN mkdir -p staticfiles
+
 ENV KEGBOT_ENV=test \
     KEGBOT_SECRET_KEY=test-secret-key \
     PYTHONDONTWRITEBYTECODE=1

@@ -203,8 +203,8 @@ class CoreModelsTestCase(TransactionTestCase):
         self.assertTrue(site.can_invite(self.user))
 
     def test_photos(self):
-        picture_file = File(open(get_filename("test_image_800x600.png"), "rb"))
-        picture_obj = models.Picture.objects.create(image=picture_file)
+        with open(get_filename("test_image_800x600.png"), "rb") as fh:
+            picture_obj = models.Picture.objects.create(image=File(fh))
 
         paths = []
         for spec in ("resized", "resized_png", "thumbnail", "thumbnail_png", "image"):
