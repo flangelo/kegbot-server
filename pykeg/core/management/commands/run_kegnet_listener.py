@@ -20,61 +20,105 @@ logger = logging.getLogger(__name__)
 KEGNET_CHANNEL = "kegnet"
 WS_GROUP = "fullscreen_pours"
 BROADCAST_INTERVAL = 0.2  # seconds — max 5 WebSocket pushes per tap per second
+TAP_INFO_TTL = 30.0  # seconds — how long to reuse a resolved meter→tap/beer mapping
+
+# meter_name → (expiry_monotonic, resolved_tuple). The mapping barely changes
+# (only on keg/tap edits), so caching it keeps the DB off the hot forwarding
+# path: during a pour we resolve once per TTL instead of ~5×/sec/tap.
+_tap_info_cache = {}
+
+
+def _lookup_all(meter_name):
+    """Resolve a raw meter name to (tap_name, beer_name, beer_image_url,
+    canonical_meter_name, ticks_per_ml). Runs in a sync_to_async thread.
+
+    The kegboard daemon sends raw device names (e.g. 'kegboard.flow0'); we
+    resolve them to DB records by port suffix matching.
+    """
+    from django.db import close_old_connections
+    from pykeg.core import models
+
+    # This daemon holds one long-lived connection that MySQL drops after
+    # wait_timeout (8h idle — i.e. overnight). Drop any stale/obsolete
+    # connection first so this query always runs on a healthy one, instead of
+    # stalling on a half-open socket or raising 'MySQL server has gone away'.
+    close_old_connections()
+
+    # 1. Exact match.
+    try:
+        meter = models.FlowMeter.get_from_meter_name(meter_name)
+    except (models.FlowMeter.DoesNotExist, Exception):
+        meter = None
+
+    # 2. Fall back to matching on port suffix (e.g. "kegboard.flow0" → "flow0").
+    if meter is None:
+        port_name = meter_name.rsplit(".", 1)[-1] if "." in meter_name else meter_name
+        meter = models.FlowMeter.objects.select_related(
+            "controller", "tap", "tap__current_keg", "tap__current_keg__type"
+        ).filter(port_name=port_name).first()
+    else:
+        meter = models.FlowMeter.objects.select_related(
+            "controller", "tap", "tap__current_keg", "tap__current_keg__type"
+        ).get(pk=meter.pk)
+
+    if meter is None:
+        return None, None, None, meter_name, None
+
+    canonical = meter.meter_name()
+    ticks_per_ml = meter.ticks_per_ml
+
+    try:
+        tap = meter.tap
+    except Exception:
+        return None, None, None, canonical, ticks_per_ml
+    if not tap:
+        return None, None, None, canonical, ticks_per_ml
+
+    keg = tap.current_keg
+    beer = None
+    beer_image_url = None
+    if keg and keg.type:
+        beer = keg.type.name
+        pic = getattr(keg.type, "picture", None)
+        if pic and pic.image:
+            from django.conf import settings
+            media_url = getattr(settings, "MEDIA_URL", "/media/")
+            beer_image_url = media_url.rstrip("/") + "/" + pic.image.name
+    return tap.name, beer, beer_image_url, canonical, ticks_per_ml
+
+
+def _reset_db_connection():
+    """Force the next query to reconnect after a DB error."""
+    from django.db import connection
+    connection.close()
 
 
 async def _get_tap_info(meter_name):
-    """Return (tap_name, beer_name, beer_image_url, canonical_meter_name, ticks_per_ml).
+    """Cached, fault-tolerant wrapper around _lookup_all.
 
-    The kegboard daemon sends raw device names (e.g. 'kegboard.flow0').
-    We resolve these to database records by port suffix matching.
-    All DB access is kept inside a single sync_to_async block.
+    Serves a cached mapping for TAP_INFO_TTL so the WebSocket forwarding loop
+    doesn't touch the DB on every broadcast. A DB error never propagates: we
+    drop the connection and reuse the last cached value (or a minimal fallback)
+    so a stale/slow connection can neither freeze nor crash the bridge.
     """
-    from pykeg.core import models
+    now = time.monotonic()
+    cached = _tap_info_cache.get(meter_name)
+    if cached and cached[0] > now:
+        return cached[1]
 
-    def _lookup_all():
-        # 1. Exact match.
-        try:
-            meter = models.FlowMeter.get_from_meter_name(meter_name)
-        except (models.FlowMeter.DoesNotExist, Exception):
-            meter = None
+    try:
+        result = await sync_to_async(_lookup_all)(meter_name)
+    except Exception as exc:
+        # str(exc): the Redis log handler JSON-serializes log args, so a raw
+        # exception object would itself raise inside this error handler.
+        logger.warning("Tap lookup failed for %s (%s); using cached/fallback", meter_name, str(exc))
+        await sync_to_async(_reset_db_connection)()
+        if cached:
+            return cached[1]  # serve stale mapping rather than a blank overlay
+        return None, None, None, meter_name, None
 
-        # 2. Fall back to matching on port suffix (e.g. "kegboard.flow0" → "flow0").
-        if meter is None:
-            port_name = meter_name.rsplit(".", 1)[-1] if "." in meter_name else meter_name
-            meter = models.FlowMeter.objects.select_related(
-                "controller", "tap", "tap__current_keg", "tap__current_keg__type"
-            ).filter(port_name=port_name).first()
-        else:
-            meter = models.FlowMeter.objects.select_related(
-                "controller", "tap", "tap__current_keg", "tap__current_keg__type"
-            ).get(pk=meter.pk)
-
-        if meter is None:
-            return None, None, None, meter_name, None
-
-        canonical = meter.meter_name()
-        ticks_per_ml = meter.ticks_per_ml
-
-        try:
-            tap = meter.tap
-        except Exception:
-            return None, None, None, canonical, ticks_per_ml
-        if not tap:
-            return None, None, None, canonical, ticks_per_ml
-
-        keg = tap.current_keg
-        beer = None
-        beer_image_url = None
-        if keg and keg.type:
-            beer = keg.type.name
-            pic = getattr(keg.type, "picture", None)
-            if pic and pic.image:
-                from django.conf import settings
-                media_url = getattr(settings, "MEDIA_URL", "/media/")
-                beer_image_url = media_url.rstrip("/") + "/" + pic.image.name
-        return tap.name, beer, beer_image_url, canonical, ticks_per_ml
-
-    return await sync_to_async(_lookup_all)()
+    _tap_info_cache[meter_name] = (now + TAP_INFO_TTL, result)
+    return result
 
 
 async def listen(redis_url):
@@ -136,7 +180,7 @@ async def listen(redis_url):
                 canonical_meter, volume_ml, ticks,
             )
         except Exception as exc:
-            logger.warning("Failed to broadcast pour event: %s", exc)
+            logger.warning("Failed to broadcast pour event: %s", str(exc))
 
 
 class Command(BaseCommand):

@@ -17,6 +17,14 @@ from pykeg.core.management.commands import run_kegnet_listener as listener
 from pykeg.test import factories
 
 
+@pytest.fixture(autouse=True)
+def _clear_tap_info_cache():
+    """The meter→tap cache is module-level; isolate it between tests."""
+    listener._tap_info_cache.clear()
+    yield
+    listener._tap_info_cache.clear()
+
+
 def _seed():
     factories.create_site()
     factories.start_keg("kegboard.flow0")
@@ -55,6 +63,59 @@ async def test_get_tap_info_unknown_meter_returns_nones():
     assert tap_name is None
     assert beer_name is None
     assert ticks_per_ml is None
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_tap_info_is_cached(monkeypatch):
+    await database_sync_to_async(_seed)()
+
+    calls = {"n": 0}
+    real = listener._lookup_all
+
+    def counting_lookup(meter_name):
+        calls["n"] += 1
+        return real(meter_name)
+
+    monkeypatch.setattr(listener, "_lookup_all", counting_lookup)
+
+    first = await listener._get_tap_info("kegboard.flow0")
+    second = await listener._get_tap_info("kegboard.flow0")
+
+    assert first == second
+    assert calls["n"] == 1  # second call served from cache, no DB hit
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_tap_info_db_error_returns_fallback(monkeypatch):
+    def boom(meter_name):
+        raise RuntimeError("connection lost")
+
+    monkeypatch.setattr(listener, "_lookup_all", boom)
+
+    # A DB failure must not propagate: the loop keeps running with minimal info.
+    result = await listener._get_tap_info("kegboard.flow0")
+    assert result == (None, None, None, "kegboard.flow0", None)
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_get_tap_info_db_error_serves_stale_cache(monkeypatch):
+    await database_sync_to_async(_seed)()
+
+    good = await listener._get_tap_info("kegboard.flow0")
+    assert good[0] == "Main Tap"
+
+    # Expire the cached entry so the next call attempts a fresh (failing) lookup.
+    _, value = listener._tap_info_cache["kegboard.flow0"]
+    listener._tap_info_cache["kegboard.flow0"] = (0.0, value)
+
+    def boom(meter_name):
+        raise RuntimeError("connection lost")
+
+    monkeypatch.setattr(listener, "_lookup_all", boom)
+
+    # Lookup fails, but the last-known mapping is served instead of a blank overlay.
+    stale = await listener._get_tap_info("kegboard.flow0")
+    assert stale == good
 
 
 class _FakePubSub:
