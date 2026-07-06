@@ -13,10 +13,16 @@ Code is written on the **MacBook** (`/Users/frodelangelo/src/kegbot-server`), th
 # 1. Make changes locally, commit, push
 git add <files> && git commit -m "..." && git push
 
-# 2. On the Pi: pull and build a new image
-ssh kegberry "cd ~/src/kegbot-server && git pull && docker build -t ghcr.io/flangelo/kegbot-server:latest ."
+# 2. On the Pi: sync and build a new image.
+#    CI (.github/workflows/docker.yml) publishes the ghcr image only on `main`
+#    or `v*`/`stable` tags — NOT on `master` — so master deploys are built here
+#    on the Pi. origin/master has also been force-rebased before, and the Pi
+#    checkout carries no local commits, so hard-reset instead of `git pull`
+#    (a merge pull can hit a diverged/"forced update" state).
+ssh kegberry "cd ~/src/kegbot-server && git fetch origin && git reset --hard origin/master && docker build -t ghcr.io/flangelo/kegbot-server:latest ."
 
 # 3. Deploy (docker-compose lives in ~/kegberry on the Pi)
+#    Rebuilding `latest` above means `up -d` recreates the affected services.
 ssh kegberry "cd ~/kegberry && docker compose up -d kegbot kegnet-listener workers"
 
 # 4. Check logs
