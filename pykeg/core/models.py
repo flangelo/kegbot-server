@@ -309,6 +309,28 @@ class KegbotSite(models.Model):
         "before it is considered to be finished.  "
         "Recommended value is %s." % kb_common.DRINK_SESSION_TIME_MINUTES,
     )
+    keg_indicator_low_pints = models.PositiveIntegerField(
+        default=10,
+        help_text='Show the "LOW KEG" indicator when at most this many pints remain '
+        "(or when the low percent threshold is crossed, whichever comes first).",
+    )
+    keg_indicator_low_percent = models.PositiveIntegerField(
+        default=15,
+        validators=[MaxValueValidator(100)],
+        help_text='Show the "LOW KEG" indicator when the keg is at most this percent full '
+        "(or when the low pints threshold is crossed, whichever comes first).",
+    )
+    keg_indicator_critical_pints = models.PositiveIntegerField(
+        default=4,
+        help_text='Escalate to the "ALMOST EMPTY" indicator when at most this many pints '
+        "remain (or when the critical percent threshold is crossed, whichever comes first).",
+    )
+    keg_indicator_critical_percent = models.PositiveIntegerField(
+        default=5,
+        validators=[MaxValueValidator(100)],
+        help_text='Escalate to the "ALMOST EMPTY" indicator when the keg is at most this '
+        "percent full (or when the critical pints threshold is crossed, whichever comes first).",
+    )
     privacy = models.CharField(
         max_length=63,
         choices=PRIVACY_CHOICES,
@@ -1035,14 +1057,19 @@ class Keg(models.Model):
     def is_empty(self):
         return float(self.remaining_volume_ml()) <= 0
 
-    def level_status(self):
+    def level_status(self, site=None):
         """Returns "critical", "low", or None as the keg nears empty.
 
-        Each tier triggers on pints remaining OR percent full, whichever
-        crosses first. Percent checks are skipped when full_volume_ml is
-        unset/zero (percent_full() returns 0 there, which would falsely
-        read as critical).
+        Thresholds come from the KegbotSite keg_indicator_* settings. Each
+        tier triggers on pints remaining OR percent full, whichever crosses
+        first. Percent checks are skipped when full_volume_ml is unset/zero
+        (percent_full() returns 0 there, which would falsely read as
+        critical).
+
+        Pass ``site`` when calling in a loop to avoid a per-keg query.
         """
+        if site is None:
+            site = KegbotSite.get()
         remaining_ml = max(0.0, float(self.remaining_volume_ml()))
         pints = units.Quantity(remaining_ml).InPints()
         percent = self.percent_full() if self.full_volume_ml and self.full_volume_ml > 0 else None
@@ -1050,11 +1077,11 @@ class Keg(models.Model):
         def hits(pints_floor, percent_floor):
             if pints <= pints_floor:
                 return True
-            return percent is not None and percent <= percent_floor * 100
+            return percent is not None and percent <= percent_floor
 
-        if hits(kb_common.KEG_VOLUME_CRITICAL_PINTS, kb_common.KEG_VOLUME_CRITICAL_PERCENT):
+        if hits(site.keg_indicator_critical_pints, site.keg_indicator_critical_percent):
             return "critical"
-        if hits(kb_common.KEG_VOLUME_LOW_PINTS, kb_common.KEG_VOLUME_LOW_PERCENT):
+        if hits(site.keg_indicator_low_pints, site.keg_indicator_low_percent):
             return "low"
         return None
 

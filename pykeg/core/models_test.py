@@ -278,3 +278,24 @@ class KegLevelStatusTestCase(TransactionTestCase):
         # floors should apply (here: nothing left → critical, no crash).
         keg = self.keg_with_remaining(0, 0)
         self.assertEqual("critical", keg.level_status())
+
+    def test_thresholds_are_site_configurable(self):
+        # 15 pints in a sixth barrel (~36% full) is fine at the defaults.
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 15 * self.PINT_ML)
+        self.assertIsNone(keg.level_status())
+
+        site = models.KegbotSite.get()
+        site.keg_indicator_low_pints = 20
+        site.save()
+        self.assertEqual("low", keg.level_status())
+
+        site.keg_indicator_critical_pints = 18
+        site.save()
+        self.assertEqual("critical", keg.level_status())
+
+    def test_explicit_site_overrides_db_settings(self):
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 15 * self.PINT_ML)
+        site = models.KegbotSite.get()
+        site.keg_indicator_low_pints = 20  # not saved
+        self.assertEqual("low", keg.level_status(site=site))
+        self.assertIsNone(keg.level_status())

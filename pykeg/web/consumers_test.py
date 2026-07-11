@@ -122,6 +122,16 @@ class TestBuildTapStatePayload:
         entry = build_tap_state_payload()[0]
         assert entry["low_status"] == "critical"
 
+    def test_low_status_uses_site_configured_thresholds(self):
+        self._setup_site()
+        # A fresh half barrel (~124 pints) is not low at the defaults, but is
+        # once the site's low-pints threshold is raised above it.
+        site = models.KegbotSite.get()
+        site.keg_indicator_low_pints = 130
+        site.save()
+        entry = build_tap_state_payload()[0]
+        assert entry["low_status"] == "low"
+
 
 def _seed_site_with_keg():
     factories.create_site()

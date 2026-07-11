@@ -355,6 +355,10 @@ class GeneralSiteSettingsForm(forms.ModelForm):
             "enable_users",
             "privacy",
             "registration_mode",
+            "keg_indicator_low_pints",
+            "keg_indicator_low_percent",
+            "keg_indicator_critical_pints",
+            "keg_indicator_critical_percent",
         )
 
     helper = FormHelper()
@@ -365,10 +369,36 @@ class GeneralSiteSettingsForm(forms.ModelForm):
         Field("enable_users", css_class="input-xlarge"),
         Field("privacy", css_class="input-xlarge"),
         Field("registration_mode", css_class="input-xlarge"),
+        Field("keg_indicator_low_pints", css_class="input-xlarge"),
+        Field("keg_indicator_low_percent", css_class="input-xlarge"),
+        Field("keg_indicator_critical_pints", css_class="input-xlarge"),
+        Field("keg_indicator_critical_percent", css_class="input-xlarge"),
         FormActions(
             Submit("submit", "Save Settings", css_class="btn-primary"),
         ),
     )
+
+    def clean(self):
+        cleaned_data = super(GeneralSiteSettingsForm, self).clean()
+        low_pints = cleaned_data.get("keg_indicator_low_pints")
+        critical_pints = cleaned_data.get("keg_indicator_critical_pints")
+        if low_pints is not None and critical_pints is not None and critical_pints > low_pints:
+            self.add_error(
+                "keg_indicator_critical_pints",
+                "Critical pints threshold must not exceed the low pints threshold.",
+            )
+        low_percent = cleaned_data.get("keg_indicator_low_percent")
+        critical_percent = cleaned_data.get("keg_indicator_critical_percent")
+        if (
+            low_percent is not None
+            and critical_percent is not None
+            and critical_percent > low_percent
+        ):
+            self.add_error(
+                "keg_indicator_critical_percent",
+                "Critical percent threshold must not exceed the low percent threshold.",
+            )
+        return cleaned_data
 
 
 class LocationSiteSettingsForm(forms.ModelForm):

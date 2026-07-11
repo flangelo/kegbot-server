@@ -79,3 +79,57 @@ class KegadminBeverageTestCase(TestCase):
         self.assertTrue(
             models.BeverageProducer.objects.filter(name="Test Brewery").exists()
         )
+
+
+class KegadminGeneralSettingsTestCase(TestCase):
+    def setUp(self):
+        defaults.set_defaults(set_is_setup=True, create_controller=True)
+        user = models.User.objects.create(username="admin", is_staff=True)
+        user.set_password("testpass")
+        user.save()
+        self.client.login(username="admin", password="testpass")
+
+    def _post_settings(self, **overrides):
+        data = {
+            "title": "My Kegbot",
+            "enable_sensing": "on",
+            "enable_users": "on",
+            "privacy": "public",
+            "registration_mode": "public",
+            "keg_indicator_low_pints": 12,
+            "keg_indicator_low_percent": 20,
+            "keg_indicator_critical_pints": 3,
+            "keg_indicator_critical_percent": 4,
+        }
+        data.update(overrides)
+        return self.client.post("/kegadmin/settings/general/", data=data, follow=True)
+
+    def test_saves_keg_indicator_thresholds(self):
+        response = self._post_settings()
+        self.assertEqual(200, response.status_code)
+        self.assertContains(response, "Settings were updated.")
+
+        site = models.KegbotSite.get()
+        self.assertEqual(12, site.keg_indicator_low_pints)
+        self.assertEqual(20, site.keg_indicator_low_percent)
+        self.assertEqual(3, site.keg_indicator_critical_pints)
+        self.assertEqual(4, site.keg_indicator_critical_percent)
+
+    def test_rejects_critical_above_low(self):
+        response = self._post_settings(keg_indicator_critical_pints=15)
+        self.assertContains(
+            response, "Critical pints threshold must not exceed the low pints threshold."
+        )
+        self.assertEqual(10, models.KegbotSite.get().keg_indicator_low_pints)
+
+        response = self._post_settings(keg_indicator_critical_percent=25)
+        self.assertContains(
+            response,
+            "Critical percent threshold must not exceed the low percent threshold.",
+        )
+        self.assertEqual(15, models.KegbotSite.get().keg_indicator_low_percent)
+
+    def test_rejects_percent_above_100(self):
+        response = self._post_settings(keg_indicator_low_percent=101)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(15, models.KegbotSite.get().keg_indicator_low_percent)
