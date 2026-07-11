@@ -98,6 +98,30 @@ class TestBuildTapStatePayload:
         entry = build_tap_state_payload()[0]
         assert entry["temp_str"] is None
 
+    def test_fresh_keg_has_no_low_status(self):
+        self._setup_site()
+        entry = build_tap_state_payload()[0]
+        assert entry["low_status"] is None
+
+    def _drain_keg_to(self, remaining_ml):
+        keg = models.KegTap.objects.get(name="Main Tap").current_keg
+        keg.served_volume_ml = keg.full_volume_ml - remaining_ml
+        keg.save()
+
+    def test_low_keg_reports_low_status(self):
+        self._setup_site()
+        # ~8 pints left in the default half barrel (~6.5% full).
+        self._drain_keg_to(8 * 473.176)
+        entry = build_tap_state_payload()[0]
+        assert entry["low_status"] == "low"
+
+    def test_nearly_empty_keg_reports_critical_status(self):
+        self._setup_site()
+        # ~2 pints left (~1.6% full).
+        self._drain_keg_to(2 * 473.176)
+        entry = build_tap_state_payload()[0]
+        assert entry["low_status"] == "critical"
+
 
 def _seed_site_with_keg():
     factories.create_site()

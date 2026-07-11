@@ -235,7 +235,37 @@ function handleTapState(data) {
         if (tap.illustration_url) {
             $('[data-tap-illustration="' + id + '"]').attr('src', tap.illustration_url);
         }
+
+        // low_status transitions in both directions (e.g. a fresh keg is
+        // tapped), so update unconditionally rather than only when set.
+        updateLowStatus(id, tap.low_status);
     });
+}
+
+function updateLowStatus(tapId, lowStatus) {
+    var badgeEl = $('[data-tap-low="' + tapId + '"]');
+    if (badgeEl.length) {
+        badgeEl.removeClass('low critical');
+        if (lowStatus === 'low' || lowStatus === 'critical') {
+            badgeEl.addClass(lowStatus);
+            badgeEl.text(lowStatus === 'critical' ? 'ALMOST EMPTY' : 'LOW KEG');
+            badgeEl.removeAttr('hidden');
+        } else {
+            badgeEl.attr('hidden', 'hidden');
+        }
+    }
+
+    var volEl = $('[data-tap-volume="' + tapId + '"]');
+    if (volEl.length) {
+        volEl.removeClass('label-info label-warning label-important');
+        if (lowStatus === 'critical') {
+            volEl.addClass('label-important');
+        } else if (lowStatus === 'low') {
+            volEl.addClass('label-warning');
+        } else {
+            volEl.addClass('label-info');
+        }
+    }
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

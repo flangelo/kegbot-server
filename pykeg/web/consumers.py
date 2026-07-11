@@ -75,6 +75,7 @@ def build_tap_state_payload():
                 "volume_label": volume_label,
                 "illustration_url": illustration_url,
                 "temp_str": temp_str,
+                "low_status": keg.level_status(),  # None | "low" | "critical"
             }
         )
 

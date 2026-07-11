@@ -9,7 +9,7 @@ from django.test import TransactionTestCase
 from pykeg.core.testutils import get_filename
 from pykeg.util import units
 
-from . import kb_common, models
+from . import kb_common, keg_sizes, models
 from .testutils import make_datetime
 
 
@@ -216,3 +216,65 @@ class CoreModelsTestCase(TransactionTestCase):
         picture_obj.erase_and_delete()
         for path in paths:
             self.assertFalse(os.path.exists(path))
+
+
+class KegLevelStatusTestCase(TransactionTestCase):
+    """Tests for Keg.level_status() tier thresholds (pints OR percent)."""
+
+    HALF_BARREL_ML = keg_sizes.VOLUMES_ML[keg_sizes.HALF_BARREL]
+    SIXTH_BARREL_ML = keg_sizes.VOLUMES_ML[keg_sizes.SIXTH_BARREL]
+    PINT_ML = units.UNITS.Pint.value
+
+    def keg_with_remaining(self, full_volume_ml, remaining_ml):
+        return models.Keg(
+            full_volume_ml=full_volume_ml,
+            served_volume_ml=full_volume_ml - remaining_ml,
+        )
+
+    def test_fresh_keg_is_none(self):
+        keg = self.keg_with_remaining(self.HALF_BARREL_ML, self.HALF_BARREL_ML)
+        self.assertIsNone(keg.level_status())
+
+    def test_half_full_keg_is_none(self):
+        keg = self.keg_with_remaining(self.HALF_BARREL_ML, self.HALF_BARREL_ML / 2)
+        self.assertIsNone(keg.level_status())
+
+    def test_low_via_percent_before_pints_on_large_keg(self):
+        # 12 pints left in a half barrel is ~9.7% full: over the 10-pint
+        # floor but under the 15% floor.
+        keg = self.keg_with_remaining(self.HALF_BARREL_ML, 12 * self.PINT_ML)
+        self.assertEqual("low", keg.level_status())
+
+    def test_low_via_pints_before_percent_on_small_keg(self):
+        # 8 pints left in a sixth barrel is ~19% full: over the 15% floor
+        # but under the 10-pint floor.
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 8 * self.PINT_ML)
+        self.assertEqual("low", keg.level_status())
+
+    def test_critical_via_percent_on_large_keg(self):
+        # 5 pints left in a half barrel is ~4% full: over the 4-pint floor
+        # but under the 5% floor.
+        keg = self.keg_with_remaining(self.HALF_BARREL_ML, 5 * self.PINT_ML)
+        self.assertEqual("critical", keg.level_status())
+
+    def test_critical_via_pints_on_small_keg(self):
+        # 3 pints left in a sixth barrel is ~7% full: over the 5% floor but
+        # under the 4-pint floor.
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 3 * self.PINT_ML)
+        self.assertEqual("critical", keg.level_status())
+
+    def test_tiers_trigger_just_below_pint_floors(self):
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 9.99 * self.PINT_ML)
+        self.assertEqual("low", keg.level_status())
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 3.99 * self.PINT_ML)
+        self.assertEqual("critical", keg.level_status())
+
+    def test_empty_keg_is_critical(self):
+        keg = self.keg_with_remaining(self.HALF_BARREL_ML, 0)
+        self.assertEqual("critical", keg.level_status())
+
+    def test_zero_full_volume_uses_pints_only(self):
+        # percent_full() returns 0 for a zero-size keg; only the pints
+        # floors should apply (here: nothing left → critical, no crash).
+        keg = self.keg_with_remaining(0, 0)
+        self.assertEqual("critical", keg.level_status())

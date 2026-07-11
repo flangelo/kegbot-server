@@ -1035,6 +1035,29 @@ class Keg(models.Model):
     def is_empty(self):
         return float(self.remaining_volume_ml()) <= 0
 
+    def level_status(self):
+        """Returns "critical", "low", or None as the keg nears empty.
+
+        Each tier triggers on pints remaining OR percent full, whichever
+        crosses first. Percent checks are skipped when full_volume_ml is
+        unset/zero (percent_full() returns 0 there, which would falsely
+        read as critical).
+        """
+        remaining_ml = max(0.0, float(self.remaining_volume_ml()))
+        pints = units.Quantity(remaining_ml).InPints()
+        percent = self.percent_full() if self.full_volume_ml and self.full_volume_ml > 0 else None
+
+        def hits(pints_floor, percent_floor):
+            if pints <= pints_floor:
+                return True
+            return percent is not None and percent <= percent_floor * 100
+
+        if hits(kb_common.KEG_VOLUME_CRITICAL_PINTS, kb_common.KEG_VOLUME_CRITICAL_PERCENT):
+            return "critical"
+        if hits(kb_common.KEG_VOLUME_LOW_PINTS, kb_common.KEG_VOLUME_LOW_PERCENT):
+            return "low"
+        return None
+
     def is_available(self):
         return self.status == self.STATUS_AVAILABLE
 

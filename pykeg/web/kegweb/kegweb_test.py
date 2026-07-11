@@ -282,3 +282,34 @@ class KegwebTestCase(TransactionTestCase):
         kbsite.save()
         response = self.client.get("/")
         self.assertContains(response, "Kegbot Offline", status_code=403)
+
+    def test_fullscreen_low_keg_badge(self):
+        keg = models.Keg.start_keg(
+            "kegboard.flow0",
+            beverage_name="Unknown",
+            producer_name="Unknown",
+            beverage_type="beer",
+            style_name="Unknown",
+        )
+
+        # Fresh keg: badge rendered but hidden.
+        for endpoint in ("/fullscreen/", "/fullscreen-realtime/"):
+            response = self.client.get(endpoint)
+            self.assertContains(response, "keg-low-badge", status_code=200)
+            self.assertContains(response, "hidden")
+
+        # Drain to ~8 pints: amber LOW KEG badge, warning label.
+        keg.served_volume_ml = keg.full_volume_ml - 8 * 473.176
+        keg.save()
+        response = self.client.get("/fullscreen-realtime/")
+        self.assertContains(response, "keg-low-badge low")
+        self.assertContains(response, "LOW KEG")
+        self.assertContains(response, "label-warning")
+
+        # Drain to ~2 pints: red ALMOST EMPTY badge, important label.
+        keg.served_volume_ml = keg.full_volume_ml - 2 * 473.176
+        keg.save()
+        response = self.client.get("/fullscreen-realtime/")
+        self.assertContains(response, "keg-low-badge critical")
+        self.assertContains(response, "ALMOST EMPTY")
+        self.assertContains(response, "label-important")

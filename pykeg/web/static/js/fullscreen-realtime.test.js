@@ -22,7 +22,7 @@ function loadModule() {
     SOURCE +
       "\nreturn {" +
       "  handlePourUpdate, handlePourEnded, removePour, buildPourCard," +
-      "  renderPourPanel, handleTapState," +
+      "  renderPourPanel, handleTapState, updateLowStatus," +
       "  pourOrder, currentPours, pourSettled, pourBaselines," +
       "  CONFIG: FULLSCREEN_REALTIME_CONFIG" +
       "};"
@@ -137,22 +137,30 @@ describe("renderPourPanel", () => {
   });
 });
 
+// Minimal jQuery shim backed by the real DOM.
+function installJQueryShim() {
+  global.$ = (selector) => {
+    const els = [...document.querySelectorAll(selector)];
+    return {
+      length: els.length,
+      text: (t) => els.forEach((e) => (e.textContent = t)),
+      attr: (a, v) => els.forEach((e) => e.setAttribute(a, v)),
+      removeAttr: (a) => els.forEach((e) => e.removeAttribute(a)),
+      addClass: (c) =>
+        els.forEach((e) => e.classList.add(...c.split(/\s+/))),
+      removeClass: (c) =>
+        els.forEach((e) => e.classList.remove(...c.split(/\s+/))),
+    };
+  };
+}
+
 describe("handleTapState", () => {
   it("updates volume, temperature and illustration DOM nodes", () => {
     document.body.innerHTML =
       '<span data-tap-volume="1"></span>' +
       '<span data-tap-temp="1"></span>' +
       '<img data-tap-illustration="1" />';
-
-    // Minimal jQuery shim backed by the real DOM.
-    global.$ = (selector) => {
-      const els = [...document.querySelectorAll(selector)];
-      return {
-        length: els.length,
-        text: (t) => els.forEach((e) => (e.textContent = t)),
-        attr: (a, v) => els.forEach((e) => e.setAttribute(a, v)),
-      };
-    };
+    installJQueryShim();
 
     mod.handleTapState({
       taps: [
@@ -174,5 +182,60 @@ describe("handleTapState", () => {
     expect(
       document.querySelector('[data-tap-illustration="1"]').getAttribute("src")
     ).toBe("/static/images/keg/full/keg-srm14-5.png");
+  });
+});
+
+describe("updateLowStatus", () => {
+  const badge = () => document.querySelector('[data-tap-low="1"]');
+  const volume = () => document.querySelector('[data-tap-volume="1"]');
+
+  beforeEach(() => {
+    document.body.innerHTML =
+      '<span class="keg-low-badge" data-tap-low="1" hidden></span>' +
+      '<span class="label label-info" data-tap-volume="1">120 oz remaining</span>';
+    installJQueryShim();
+  });
+
+  it("shows an amber LOW KEG badge when status is low", () => {
+    mod.updateLowStatus(1, "low");
+    expect(badge().hasAttribute("hidden")).toBe(false);
+    expect(badge().classList.contains("low")).toBe(true);
+    expect(badge().textContent).toBe("LOW KEG");
+    expect(volume().classList.contains("label-warning")).toBe(true);
+    expect(volume().classList.contains("label-info")).toBe(false);
+  });
+
+  it("escalates to a red ALMOST EMPTY badge when critical", () => {
+    mod.updateLowStatus(1, "low");
+    mod.updateLowStatus(1, "critical");
+    expect(badge().hasAttribute("hidden")).toBe(false);
+    expect(badge().classList.contains("critical")).toBe(true);
+    expect(badge().classList.contains("low")).toBe(false);
+    expect(badge().textContent).toBe("ALMOST EMPTY");
+    expect(volume().classList.contains("label-important")).toBe(true);
+    expect(volume().classList.contains("label-warning")).toBe(false);
+  });
+
+  it("clears the badge when status returns to null (fresh keg)", () => {
+    mod.updateLowStatus(1, "critical");
+    mod.updateLowStatus(1, null);
+    expect(badge().hasAttribute("hidden")).toBe(true);
+    expect(badge().classList.contains("critical")).toBe(false);
+    expect(volume().classList.contains("label-info")).toBe(true);
+    expect(volume().classList.contains("label-important")).toBe(false);
+  });
+
+  it("is driven by tap_state messages", () => {
+    mod.handleTapState({
+      taps: [{ tap_id: 1, volume_label: "8 pints", low_status: "low" }],
+    });
+    expect(badge().hasAttribute("hidden")).toBe(false);
+    expect(badge().textContent).toBe("LOW KEG");
+    expect(volume().textContent).toBe("8 pints remaining");
+  });
+
+  it("does nothing when the badge element is absent", () => {
+    document.body.innerHTML = "";
+    expect(() => mod.updateLowStatus(1, "low")).not.toThrow();
   });
 });

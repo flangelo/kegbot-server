@@ -27,5 +27,11 @@ AUTH_MODULE_NAMES_HEX_VALUES = (AUTH_MODULE_CORE_ONEWIRE, AUTH_MODULE_CORE_RFID)
 # Low volume threshold: 15% full
 KEG_VOLUME_LOW_PERCENT = 0.15
 
+# Keg level indicator thresholds; a tier triggers when EITHER the pints
+# remaining or the percent-full floor is crossed, whichever comes first.
+KEG_VOLUME_LOW_PINTS = 10
+KEG_VOLUME_CRITICAL_PERCENT = 0.05
+KEG_VOLUME_CRITICAL_PINTS = 4
+
 # Valid usernames.
 USERNAME_REGEX = "^[\w.@+-]+$"
