@@ -106,8 +106,12 @@ img.taplist-foot-logos {
 
             <div class="row-fluid">
 
+            {% with keg.level_status as low_status %}
             <div class="span2">
-              <img data-tap-illustration="{{ tap.id }}" src="{{ keg.get_illustration }}" style="padding-bottom: 20px;">
+              <center>
+                <img data-tap-illustration="{{ tap.id }}" src="{{ keg.get_illustration }}" style="padding-bottom: 20px;">
+                <span class="keg-low-badge{% if low_status %} {{ low_status }}{% endif %}" data-tap-low="{{ tap.id }}" {% if not low_status %}hidden{% endif %}>{% if low_status == "critical" %}ALMOST EMPTY{% else %}LOW KEG{% endif %}</span>
+              </center>
             </div>
 
             <div class="span2">
@@ -117,12 +121,10 @@ img.taplist-foot-logos {
               {% else %}
                 <img class="tap-snapshot-image" src={% static "images/kegbot-unknown-square.png" %}>
               {% endif %}
-                {% with keg.level_status as low_status %}
-                <span class="keg-low-badge{% if low_status %} {{ low_status }}{% endif %}" data-tap-low="{{ tap.id }}" {% if not low_status %}hidden{% endif %}>{% if low_status == "critical" %}ALMOST EMPTY{% else %}LOW KEG{% endif %}</span>
                 <span class="label {% if low_status == "critical" %}label-important{% elif low_status == "low" %}label-warning{% else %}label-info{% endif %}" data-tap-volume="{{ tap.id }}">{% volume keg.remaining_volume_ml %} remaining</span>
-                {% endwith %}
               </center>
             </div>
+            {% endwith %}
 
             <div class="span8">
               <h2>
