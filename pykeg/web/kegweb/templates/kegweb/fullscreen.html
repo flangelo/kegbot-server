@@ -47,6 +47,10 @@ img.taplist-foot-logos {
 	max-height:100%;
 }
 
+.tap-card {
+	margin-bottom: 40px;
+}
+
 .keg-low-badge {
 	display: block;
 	margin: 6px auto 4px auto;
@@ -104,7 +108,7 @@ img.taplist-foot-logos {
             {% with tap.current_keg as keg %}
             {% with keg.type as beverage %}
 
-            <div class="row-fluid">
+            <div class="row-fluid tap-card">
 
             {% with keg.level_status as low_status %}
             <div class="span2">
