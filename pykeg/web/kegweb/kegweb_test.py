@@ -313,3 +313,40 @@ class KegwebTestCase(TransactionTestCase):
         self.assertContains(response, "keg-low-badge critical")
         self.assertContains(response, "ALMOST EMPTY")
         self.assertContains(response, "label-important")
+
+    def test_fullscreen_tap_placeholder(self):
+        # No kegs tapped: placeholder sentences are rendered on both pages.
+        for endpoint in ("/fullscreen/", "/fullscreen-realtime/"):
+            response = self.client.get(endpoint)
+            self.assertContains(response, 'id="tap-placeholder"', status_code=200)
+            self.assertContains(response, 'id="placeholder-sentences"')
+            self.assertContains(response, "The taps are dry")
+
+        # Sentences are one per line; blank lines and whitespace are dropped.
+        kbsite = models.KegbotSite.get()
+        kbsite.tap_placeholder_sentences = "  First line  \n\n\nSecond line\n"
+        kbsite.save()
+        self.assertEqual(["First line", "Second line"], kbsite.tap_placeholder_sentence_list())
+        response = self.client.get("/fullscreen/")
+        self.assertContains(response, "First line")
+        self.assertNotContains(response, "The taps are dry")
+
+        # Blank setting: no sentences rendered.
+        kbsite.tap_placeholder_sentences = ""
+        kbsite.save()
+        response = self.client.get("/fullscreen/")
+        self.assertNotContains(response, "First line")
+
+        # Once a keg is tapped, the placeholder disappears.
+        kbsite.tap_placeholder_sentences = models.DEFAULT_TAP_PLACEHOLDER_SENTENCES
+        kbsite.save()
+        models.Keg.start_keg(
+            "kegboard.flow0",
+            beverage_name="Unknown",
+            producer_name="Unknown",
+            beverage_type="beer",
+            style_name="Unknown",
+        )
+        response = self.client.get("/fullscreen/")
+        self.assertNotContains(response, 'id="tap-placeholder"')
+        self.assertNotContains(response, "The taps are dry")

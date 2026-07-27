@@ -236,6 +236,28 @@ class Invitation(models.Model):
             message.send(fail_silently=True)
 
 
+DEFAULT_TAP_PLACEHOLDER_SENTENCES = "\n".join(
+    [
+        "The taps are dry… but not for long.",
+        "Currently pouring: absolutely nothing.",
+        "A moment of silence for the kegs we've finished.",
+        "Good beer comes to those who wait.",
+        "404: Beer not found. Restocking soon.",
+        "Somewhere out there, a keg has our name on it.",
+        "The taps are napping. Please do not disturb.",
+        "Intermission — the next act is still fermenting.",
+        "All kegs have gone to a better place. (Our stomachs.)",
+        "Fresh kegs loading…",
+        "This space reserved for your next favorite beer.",
+        "Empty taps are just full taps waiting to happen.",
+        "We drank it all. We regret nothing.",
+        "Stay tuned — hops springs eternal.",
+        "The kegerator is between gigs.",
+        "New kegs are on the way. Probably.",
+    ]
+)
+
+
 class KegbotSite(models.Model):
 
     VOLUME_DISPLAY_UNITS_CHOICES = (
@@ -331,6 +353,12 @@ class KegbotSite(models.Model):
         help_text='Escalate to the "ALMOST EMPTY" indicator when the keg is at most this '
         "percent full (or when the critical pints threshold is crossed, whichever comes first).",
     )
+    tap_placeholder_sentences = models.TextField(
+        blank=True,
+        default=DEFAULT_TAP_PLACEHOLDER_SENTENCES,
+        help_text="Shown on the fullscreen display when no kegs are tapped; "
+        "one sentence per line, cycled in random order. Leave blank to show nothing.",
+    )
     privacy = models.CharField(
         max_length=63,
         choices=PRIVACY_CHOICES,
@@ -393,6 +421,10 @@ class KegbotSite(models.Model):
 
     def get_session_timeout_timedelta(self):
         return datetime.timedelta(minutes=self.session_timeout_minutes)
+
+    def tap_placeholder_sentence_list(self):
+        """Returns the placeholder sentences as a list of non-empty lines."""
+        return [s.strip() for s in self.tap_placeholder_sentences.splitlines() if s.strip()]
 
     def base_url(self):
         """Returns the base address of this system."""

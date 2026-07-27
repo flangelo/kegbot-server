@@ -82,6 +82,26 @@ img.taplist-foot-logos {
 	50% { opacity: 0.45; }
 }
 
+.tap-placeholder {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 85%;
+	text-align: center;
+	font-size: 2.6em;
+	font-style: italic;
+	letter-spacing: 1px;
+	color: #f5f5f5;
+	text-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+	opacity: 0;
+	transition: opacity 1s ease-in-out;
+}
+
+.tap-placeholder.visible {
+	opacity: 1;
+}
+
 </style>
 {% endblock %}
 
@@ -157,6 +177,43 @@ img.taplist-foot-logos {
     {% endfor %}
 
     </div> <!-- /tap-carousel -->
+
+    {% if not pages %}
+      {{ kbsite.tap_placeholder_sentence_list|json_script:"placeholder-sentences" }}
+      <div id="tap-placeholder" class="tap-placeholder"></div>
+      <script type="text/javascript">
+        (function() {
+          var el = document.getElementById('tap-placeholder');
+          var sentences = JSON.parse(
+              document.getElementById('placeholder-sentences').textContent);
+          if (!sentences.length) {
+            return;
+          }
+          // Shuffle so each reload starts somewhere new.
+          for (var i = sentences.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = sentences[i];
+            sentences[i] = sentences[j];
+            sentences[j] = tmp;
+          }
+          var index = 0;
+          function showNext() {
+            el.textContent = sentences[index % sentences.length];
+            el.classList.add('visible');
+            index++;
+          }
+          function cycle() {
+            el.classList.remove('visible');
+            setTimeout(showNext, 1100);  // wait for the 1s fade-out
+          }
+          showNext();
+          if (sentences.length > 1) {
+            setInterval(cycle, 12000);
+          }
+        })();
+      </script>
+    {% endif %}
+
   </div> <!-- /container-fluid -->
 
 </div> <!-- /wrapper -->

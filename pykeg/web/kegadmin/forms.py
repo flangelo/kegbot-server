@@ -359,6 +359,7 @@ class GeneralSiteSettingsForm(forms.ModelForm):
             "keg_indicator_low_percent",
             "keg_indicator_critical_pints",
             "keg_indicator_critical_percent",
+            "tap_placeholder_sentences",
         )
 
     helper = FormHelper()
@@ -373,6 +374,7 @@ class GeneralSiteSettingsForm(forms.ModelForm):
         Field("keg_indicator_low_percent", css_class="input-xlarge"),
         Field("keg_indicator_critical_pints", css_class="input-xlarge"),
         Field("keg_indicator_critical_percent", css_class="input-xlarge"),
+        Field("tap_placeholder_sentences", css_class="input-xxlarge", rows="8"),
         FormActions(
             Submit("submit", "Save Settings", css_class="btn-primary"),
         ),
