@@ -1,6 +1,7 @@
 import logging
 import time
 
+from django.db import transaction
 from django.dispatch import receiver
 
 from . import signals, tasks
@@ -59,6 +60,30 @@ def on_events_created(sender, **kwargs):
     """Send events to plugins."""
     events = kwargs["events"]
     tasks.schedule_tasks(events)
+
+
+@receiver(signals.keg_attached)
+@receiver(signals.keg_ended)
+def on_keg_changed_reload_fullscreen(sender, **kwargs):
+    """Reload fullscreen displays when a keg is attached or removed.
+
+    Tap cards are server-rendered, so a page reload is the only way for
+    connected displays to pick up a new or removed keg. Deferred to commit
+    time: attach_keg/end_keg run inside atomic blocks, and the reloading
+    browser must see the new state.
+    """
+    transaction.on_commit(_broadcast_fullscreen_reload)
+
+
+def _broadcast_fullscreen_reload():
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)("fullscreen_pours", {"type": "reload_event"})
+    except Exception as exc:
+        logger.warning("Failed to broadcast fullscreen reload: %s", exc)
 
 
 @receiver(signals.pour_in_progress)
