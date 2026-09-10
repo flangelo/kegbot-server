@@ -9,11 +9,39 @@
 
 <style>
 
+/* Kiosk display: nothing is scrollable, so never show a scrollbar. */
+html, body {
+	overflow: hidden;
+}
+
 body {
 	background-color: #000;
 	background-image: url({% static "images/chalkboard-bg.jpg" %}) center center no-repeat;
   background-size: cover;
   color: #eee;
+}
+
+/* slick.css hangs the paging dots 45px below the slider and adds a 30px
+   bottom margin, pushing the page past the viewport. Pin the dots to the
+   bottom of the screen instead, and make them visible on the dark bg. */
+.slick-slider {
+	margin-bottom: 0;
+}
+
+.slick-dots {
+	position: fixed;
+	bottom: 6px;
+	left: 0;
+}
+
+.slick-dots li button:before {
+	color: #fff;
+	opacity: 0.3;
+}
+
+.slick-dots li.slick-active button:before {
+	color: #fff;
+	opacity: 0.8;
 }
 
 .establishment-logo {
