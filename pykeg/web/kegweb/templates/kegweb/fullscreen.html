@@ -105,6 +105,11 @@ img.taplist-foot-logos {
 	animation: keg-low-pulse 1.5s ease-in-out infinite;
 }
 
+.keg-low-badge.empty {
+	background-color: #7f1d1d;
+	border: 1px solid #b94a48;
+}
+
 @keyframes keg-low-pulse {
 	0%, 100% { opacity: 1; }
 	50% { opacity: 0.45; }
@@ -163,7 +168,7 @@ img.taplist-foot-logos {
             <div class="span2">
               <center>
                 <img data-tap-illustration="{{ tap.id }}" src="{{ keg.get_illustration }}" style="padding-bottom: 20px;">
-                <span class="keg-low-badge{% if low_status %} {{ low_status }}{% endif %}" data-tap-low="{{ tap.id }}" {% if not low_status %}hidden{% endif %}>{% if low_status == "critical" %}ALMOST EMPTY{% else %}LOW KEG{% endif %}</span>
+                <span class="keg-low-badge{% if low_status %} {{ low_status }}{% endif %}" data-tap-low="{{ tap.id }}" {% if not low_status %}hidden{% endif %}>{% if low_status == "empty" %}EMPTY{% elif low_status == "critical" %}ALMOST EMPTY{% else %}LOW KEG{% endif %}</span>
               </center>
             </div>
 
@@ -174,7 +179,7 @@ img.taplist-foot-logos {
               {% else %}
                 <img class="tap-snapshot-image" src={% static "images/kegbot-unknown-square.png" %}>
               {% endif %}
-                <span class="label {% if low_status == "critical" %}label-important{% elif low_status == "low" %}label-warning{% else %}label-info{% endif %}" data-tap-volume="{{ tap.id }}">{% volume keg.remaining_volume_ml %} remaining</span>
+                <span class="label {% if low_status == "empty" or low_status == "critical" %}label-important{% elif low_status == "low" %}label-warning{% else %}label-info{% endif %}" data-tap-volume="{{ tap.id }}">{% volume keg.remaining_volume_ml %} remaining</span>
               </center>
             </div>
             {% endwith %}

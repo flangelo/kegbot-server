@@ -373,6 +373,10 @@ class KegbotSite(models.Model):
         help_text='Escalate to the "ALMOST EMPTY" indicator when the keg is at most this '
         "percent full (or when the critical pints threshold is crossed, whichever comes first).",
     )
+    keg_indicator_empty_pints = models.PositiveIntegerField(
+        default=3,
+        help_text='Escalate to the "EMPTY" indicator when at most this many pints remain.',
+    )
     tap_placeholder_sentences = models.TextField(
         blank=True,
         default=DEFAULT_TAP_PLACEHOLDER_SENTENCES,
@@ -1110,11 +1114,13 @@ class Keg(models.Model):
         return float(self.remaining_volume_ml()) <= 0
 
     def level_status(self, site=None):
-        """Returns "critical", "low", or None as the keg nears empty.
+        """Returns "empty", "critical", "low", or None as the keg nears empty.
 
-        Thresholds come from the KegbotSite keg_indicator_* settings. Each
-        tier triggers on pints remaining OR percent full, whichever crosses
-        first. Percent checks are skipped when full_volume_ml is unset/zero
+        Thresholds come from the KegbotSite keg_indicator_* settings. The
+        low and critical tiers trigger on pints remaining OR percent full,
+        whichever crosses first; the empty tier is pints-only, since "about
+        to kick" is an absolute amount regardless of keg size. Percent
+        checks are skipped when full_volume_ml is unset/zero
         (percent_full() returns 0 there, which would falsely read as
         critical).
 
@@ -1131,6 +1137,8 @@ class Keg(models.Model):
                 return True
             return percent is not None and percent <= percent_floor
 
+        if pints <= site.keg_indicator_empty_pints:
+            return "empty"
         if hits(site.keg_indicator_critical_pints, site.keg_indicator_critical_percent):
             return "critical"
         if hits(site.keg_indicator_low_pints, site.keg_indicator_low_percent):

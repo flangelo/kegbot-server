@@ -253,14 +253,15 @@ class KegLevelStatusTestCase(TransactionTestCase):
 
     def test_critical_via_percent_on_large_keg(self):
         # 5 pints left in a half barrel is ~4% full: over the 4-pint floor
-        # but under the 5% floor.
+        # but under the 5% floor. The empty tier is pints-only, so the low
+        # percent must not escalate past critical.
         keg = self.keg_with_remaining(self.HALF_BARREL_ML, 5 * self.PINT_ML)
         self.assertEqual("critical", keg.level_status())
 
     def test_critical_via_pints_on_small_keg(self):
-        # 3 pints left in a sixth barrel is ~7% full: over the 5% floor but
-        # under the 4-pint floor.
-        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 3 * self.PINT_ML)
+        # 3.5 pints left in a sixth barrel is ~8% full: over the 5% floor
+        # and the 3-pint empty floor, but under the 4-pint critical floor.
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 3.5 * self.PINT_ML)
         self.assertEqual("critical", keg.level_status())
 
     def test_tiers_trigger_just_below_pint_floors(self):
@@ -268,16 +269,22 @@ class KegLevelStatusTestCase(TransactionTestCase):
         self.assertEqual("low", keg.level_status())
         keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 3.99 * self.PINT_ML)
         self.assertEqual("critical", keg.level_status())
+        keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 2.99 * self.PINT_ML)
+        self.assertEqual("empty", keg.level_status())
 
-    def test_empty_keg_is_critical(self):
+    def test_empty_via_pints(self):
+        keg = self.keg_with_remaining(self.HALF_BARREL_ML, 3 * self.PINT_ML)
+        self.assertEqual("empty", keg.level_status())
+
+    def test_empty_keg_is_empty(self):
         keg = self.keg_with_remaining(self.HALF_BARREL_ML, 0)
-        self.assertEqual("critical", keg.level_status())
+        self.assertEqual("empty", keg.level_status())
 
     def test_zero_full_volume_uses_pints_only(self):
         # percent_full() returns 0 for a zero-size keg; only the pints
-        # floors should apply (here: nothing left → critical, no crash).
+        # floors should apply (here: nothing left → empty, no crash).
         keg = self.keg_with_remaining(0, 0)
-        self.assertEqual("critical", keg.level_status())
+        self.assertEqual("empty", keg.level_status())
 
     def test_thresholds_are_site_configurable(self):
         # 15 pints in a sixth barrel (~36% full) is fine at the defaults.
@@ -292,6 +299,10 @@ class KegLevelStatusTestCase(TransactionTestCase):
         site.keg_indicator_critical_pints = 18
         site.save()
         self.assertEqual("critical", keg.level_status())
+
+        site.keg_indicator_empty_pints = 16
+        site.save()
+        self.assertEqual("empty", keg.level_status())
 
     def test_explicit_site_overrides_db_settings(self):
         keg = self.keg_with_remaining(self.SIXTH_BARREL_ML, 15 * self.PINT_ML)

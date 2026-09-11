@@ -306,12 +306,20 @@ class KegwebTestCase(TransactionTestCase):
         self.assertContains(response, "LOW KEG")
         self.assertContains(response, "label-warning")
 
-        # Drain to ~2 pints: red ALMOST EMPTY badge, important label.
-        keg.served_volume_ml = keg.full_volume_ml - 2 * 473.176
+        # Drain to ~3.5 pints: red ALMOST EMPTY badge, important label.
+        keg.served_volume_ml = keg.full_volume_ml - 3.5 * 473.176
         keg.save()
         response = self.client.get("/fullscreen-realtime/")
         self.assertContains(response, "keg-low-badge critical")
         self.assertContains(response, "ALMOST EMPTY")
+        self.assertContains(response, "label-important")
+
+        # Drain to ~2 pints: steady EMPTY badge, important label.
+        keg.served_volume_ml = keg.full_volume_ml - 2 * 473.176
+        keg.save()
+        response = self.client.get("/fullscreen-realtime/")
+        self.assertContains(response, "keg-low-badge empty")
+        self.assertContains(response, ">EMPTY<")
         self.assertContains(response, "label-important")
 
     def test_fullscreen_tap_placeholder(self):

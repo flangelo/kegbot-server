@@ -359,6 +359,7 @@ class GeneralSiteSettingsForm(forms.ModelForm):
             "keg_indicator_low_percent",
             "keg_indicator_critical_pints",
             "keg_indicator_critical_percent",
+            "keg_indicator_empty_pints",
             "tap_placeholder_sentences",
         )
 
@@ -374,6 +375,7 @@ class GeneralSiteSettingsForm(forms.ModelForm):
         Field("keg_indicator_low_percent", css_class="input-xlarge"),
         Field("keg_indicator_critical_pints", css_class="input-xlarge"),
         Field("keg_indicator_critical_percent", css_class="input-xlarge"),
+        Field("keg_indicator_empty_pints", css_class="input-xlarge"),
         Field("tap_placeholder_sentences", css_class="input-xxlarge", rows="8"),
         FormActions(
             Submit("submit", "Save Settings", css_class="btn-primary"),
@@ -399,6 +401,12 @@ class GeneralSiteSettingsForm(forms.ModelForm):
             self.add_error(
                 "keg_indicator_critical_percent",
                 "Critical percent threshold must not exceed the low percent threshold.",
+            )
+        empty_pints = cleaned_data.get("keg_indicator_empty_pints")
+        if empty_pints is not None and critical_pints is not None and empty_pints > critical_pints:
+            self.add_error(
+                "keg_indicator_empty_pints",
+                "Empty pints threshold must not exceed the critical pints threshold.",
             )
         return cleaned_data
 

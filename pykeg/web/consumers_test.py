@@ -117,10 +117,18 @@ class TestBuildTapStatePayload:
 
     def test_nearly_empty_keg_reports_critical_status(self):
         self._setup_site()
-        # ~2 pints left (~1.6% full).
-        self._drain_keg_to(2 * 473.176)
+        # ~3.5 pints left: under the 4-pint critical floor, over the
+        # 3-pint empty floor.
+        self._drain_keg_to(3.5 * 473.176)
         entry = build_tap_state_payload()[0]
         assert entry["low_status"] == "critical"
+
+    def test_empty_keg_reports_empty_status(self):
+        self._setup_site()
+        # ~2 pints left: under the 3-pint empty floor.
+        self._drain_keg_to(2 * 473.176)
+        entry = build_tap_state_payload()[0]
+        assert entry["low_status"] == "empty"
 
     def test_low_status_uses_site_configured_thresholds(self):
         self._setup_site()

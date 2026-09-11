@@ -216,6 +216,16 @@ describe("updateLowStatus", () => {
     expect(volume().classList.contains("label-warning")).toBe(false);
   });
 
+  it("escalates to a steady EMPTY badge when empty", () => {
+    mod.updateLowStatus(1, "critical");
+    mod.updateLowStatus(1, "empty");
+    expect(badge().hasAttribute("hidden")).toBe(false);
+    expect(badge().classList.contains("empty")).toBe(true);
+    expect(badge().classList.contains("critical")).toBe(false);
+    expect(badge().textContent).toBe("EMPTY");
+    expect(volume().classList.contains("label-important")).toBe(true);
+  });
+
   it("clears the badge when status returns to null (fresh keg)", () => {
     mod.updateLowStatus(1, "critical");
     mod.updateLowStatus(1, null);

@@ -100,6 +100,7 @@ class KegadminGeneralSettingsTestCase(TestCase):
             "keg_indicator_low_percent": 20,
             "keg_indicator_critical_pints": 3,
             "keg_indicator_critical_percent": 4,
+            "keg_indicator_empty_pints": 2,
         }
         data.update(overrides)
         return self.client.post("/kegadmin/settings/general/", data=data, follow=True)
@@ -114,6 +115,7 @@ class KegadminGeneralSettingsTestCase(TestCase):
         self.assertEqual(20, site.keg_indicator_low_percent)
         self.assertEqual(3, site.keg_indicator_critical_pints)
         self.assertEqual(4, site.keg_indicator_critical_percent)
+        self.assertEqual(2, site.keg_indicator_empty_pints)
 
     def test_rejects_critical_above_low(self):
         response = self._post_settings(keg_indicator_critical_pints=15)
@@ -128,6 +130,13 @@ class KegadminGeneralSettingsTestCase(TestCase):
             "Critical percent threshold must not exceed the low percent threshold.",
         )
         self.assertEqual(15, models.KegbotSite.get().keg_indicator_low_percent)
+
+    def test_rejects_empty_above_critical(self):
+        response = self._post_settings(keg_indicator_empty_pints=5)
+        self.assertContains(
+            response, "Empty pints threshold must not exceed the critical pints threshold."
+        )
+        self.assertEqual(3, models.KegbotSite.get().keg_indicator_empty_pints)
 
     def test_rejects_percent_above_100(self):
         response = self._post_settings(keg_indicator_low_percent=101)

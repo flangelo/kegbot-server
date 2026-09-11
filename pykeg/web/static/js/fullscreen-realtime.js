@@ -242,13 +242,19 @@ function handleTapState(data) {
     });
 }
 
+var LOW_STATUS_LABELS = {
+    low: 'LOW KEG',
+    critical: 'ALMOST EMPTY',
+    empty: 'EMPTY',
+};
+
 function updateLowStatus(tapId, lowStatus) {
     var badgeEl = $('[data-tap-low="' + tapId + '"]');
     if (badgeEl.length) {
-        badgeEl.removeClass('low critical');
-        if (lowStatus === 'low' || lowStatus === 'critical') {
+        badgeEl.removeClass('low critical empty');
+        if (LOW_STATUS_LABELS[lowStatus]) {
             badgeEl.addClass(lowStatus);
-            badgeEl.text(lowStatus === 'critical' ? 'ALMOST EMPTY' : 'LOW KEG');
+            badgeEl.text(LOW_STATUS_LABELS[lowStatus]);
             badgeEl.removeAttr('hidden');
         } else {
             badgeEl.attr('hidden', 'hidden');
@@ -258,7 +264,7 @@ function updateLowStatus(tapId, lowStatus) {
     var volEl = $('[data-tap-volume="' + tapId + '"]');
     if (volEl.length) {
         volEl.removeClass('label-info label-warning label-important');
-        if (lowStatus === 'critical') {
+        if (lowStatus === 'critical' || lowStatus === 'empty') {
             volEl.addClass('label-important');
         } else if (lowStatus === 'low') {
             volEl.addClass('label-warning');
